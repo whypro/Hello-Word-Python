@@ -7,9 +7,41 @@ from models import Word, ReciteRecord, Ebbinghaus
 import pickle
 
 
+class DictManager:
+    def __init__(self, dictPath, dictPrefix):
+        self.dictionary = Dictionary(os.path.join(dictPath, dictPrefix))
+
+    def getWordByName(self, wordName):
+        try:
+            data = self.dictionary[wordName].decode('utf-8', 'ignore')
+        except KeyError, e:
+            print '未找到单词：%s' % "".join(e.message)
+            return None
+        else:
+            if data[0] == '*':
+                phonetic, interp = data.split('\n', 1)
+                phonetic = phonetic[1:]
+            else:
+                phonetic = ""
+                interp = data
+
+            word = Word()
+            word.name = wordName
+            word.phonetic = phonetic
+            word.interp = interp
+            return word
+
+    def getRandomWord(self):
+        # 随机取词
+        name = "".join(random.choice(self.dictionary.idx._idx.keys()))
+        word = self.getWordByName(name)
+        return word
+
+
 class RecordManager:
-    def __init__(self, recordPath):
+    def __init__(self, recordPath, dictManager):
         self.recordPath = recordPath
+        self.dictManager = dictManager
         self.records = []
         self.loadRecords()
 
@@ -49,7 +81,7 @@ class RecordManager:
         # 从复习列表中随机取出单词
         if len(needReciteRecords) > 0:
             wordName = random.choice(needReciteRecords).word
-            word = self.wordManager.getWordByName(wordName)
+            word = self.dictManager.getWordByName(wordName)
             return word
         else:
             # 当没有需要复习的单词时返回 None
@@ -57,9 +89,9 @@ class RecordManager:
 
 
 class NewWordManager:
-    def __init__(self, lexPath, dictPath, dictPrefix):
+    def __init__(self, lexPath, dictManager):
         self.lexPath = lexPath
-        self.dictionary = Dictionary(os.path.join(dictPath, dictPrefix))
+        self.dictManager = dictManager
 
     def getRandomWord(self):
         # try
@@ -69,59 +101,27 @@ class NewWordManager:
 
         while True:
             name = random.choice(lines)
-            word = self.getWordByName(name)
+            word = self.dictManager.getWordByName(name)
             # 如果获取失败，则尝试再次获取
             if word:
                 break
         return word
 
-    def getRandomWordFromDict(self):
-        # 随机取词
-        name = "".join(random.choice(self.dictionary.idx._idx.keys()))
-        data = self.dictionary[name].decode('utf-8', 'ignore')
-        if data[0] == '*':
-            phonetic, interp = data.split('\n', 1)
-            phonetic = phonetic[1:]
-        else:
-            phonetic = ""
-            interp = data
-
-        word = Word()
-        word.name = name
-        word.phonetic = phonetic
-        word.interp = interp
-        return word
-
-    def getWordByName(self, wordName):
-        try:
-            data = self.dictionary[wordName].decode('utf-8', 'ignore')
-        except KeyError, e:
-            return None
-        else:
-            if data[0] == '*':
-                phonetic, interp = data.split('\n', 1)
-                phonetic = phonetic[1:]
-            else:
-                phonetic = ""
-                interp = data
-
-            word = Word()
-            word.name = wordName
-            word.phonetic = phonetic
-            word.interp = interp
-            return word
-
 
 class ReciteManager:
     class Modes:
-        New, Review = range(0, 2)
+        New, Review = range(2)
 
-    def __init__(self, recordPath):
+    def __init__(self, lexPath, recordPath, dictPath, dictPrefix):
         self.reciteMode = self.Modes.New
         self.currentWord = None
         self.strange = 0
-        self.wordManager = None
-        self.recordManager = RecordManager(recordPath)
+
+        self.dictManager = DictManager(dictPath, dictPrefix)
+        self.newWordManager = None
+        self.recordManager = RecordManager(recordPath, self.dictManager)
+
+        self.setLexicon(lexPath)
 
     # 陌生度++
     def increaseStrange(self):
@@ -145,8 +145,8 @@ class ReciteManager:
         self.reciteMode = mode
 
     # 设置词库
-    def setLexicon(self, lexPath, dictPath, dictPrefix):
-        self.wordManager = WordManager(lexPath, dictPath, dictPrefix)
+    def setLexicon(self, lexPath):
+        self.newWordManager = NewWordManager(lexPath, self.dictManager)
         self.lexiconName = ''
 
     def getWord(self):
@@ -155,7 +155,7 @@ class ReciteManager:
     def nextWord(self):
         if self.reciteMode == self.Modes.New:
             while True:
-                currentWord = self.wordManager.getRandomWord()
+                currentWord = self.newWordManager.getRandomWord()
                 if currentWord not in self.recordManager.getRecords():
                     break
         elif self.reciteMode == self.Modes.Review:
@@ -206,8 +206,7 @@ if __name__ == '__main__':
     # recordManager.records.append(record)
     # recordManager.saveAllRecords()
 
-    reciteManager = ReciteManager('recite.dat')
-    reciteManager.setLexicon(u'./考研英语.txt', 'stardict-langdao-ec-gb-2.4.2', 'langdao-ec-gb')
+    reciteManager = ReciteManager(u'./考研英语.txt', 'recite.dat', 'stardict-langdao-ec-gb-2.4.2', 'langdao-ec-gb')
     reciteManager.getLexiconName()
     reciteManager.nextWord()
     print reciteManager.getWord().name

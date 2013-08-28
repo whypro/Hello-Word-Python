@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 from PyQt4 import QtGui, QtCore
-from managers import WordManager
+from managers import ReciteManager
 
 
 class MainPanel(QtGui.QWidget):
@@ -10,16 +10,17 @@ class MainPanel(QtGui.QWidget):
 
         self.layout = QtGui.QGridLayout()
 
-        self.wordManager = WordManager(u'考研英语.txt', 'stardict-langdao-ec-gb-2.4.2', 'langdao-ec-gb')
+        self.reciteManager = ReciteManager(u'./lexicons/GRE.txt', 'record/recite.dat', 'stardict-langdao-ec-gb-2.4.2', 'langdao-ec-gb')
 
         self.lblWordName = QtGui.QLabel()
-        self.lblWordName.setFont(QtGui.QFont('Arial', 42, QtGui.QFont.Bold))
+        self.lblWordName.setFont(QtGui.QFont('Times New Roman', 48, QtGui.QFont.Bold))
 
         self.btn = QtGui.QPushButton()
         self.connect(self.btn, QtCore.SIGNAL('clicked()'), self.nextWord)
 
+        QtGui.QFontDatabase.addApplicationFont('./fonts/lingoes.ttf')
         self.lblPhonetic = QtGui.QLabel()
-        self.lblPhonetic.setFont(QtGui.QFont('Courier New', 12))
+        self.lblPhonetic.setFont(QtGui.QFont('Lingoes Unicode', 14))
 
         self.lblInterp = QtGui.QTextEdit()
         self.lblInterp.setFont(QtGui.QFont('楷体', 20))
@@ -35,7 +36,9 @@ class MainPanel(QtGui.QWidget):
         self.setLayout(self.layout)
 
     def nextWord(self):
-        word = self.wordManager.getRandomWord()
+        self.sender()
+        self.reciteManager.nextWord()
+        word = self.reciteManager.getWord()
         self.lblWordName.setText(word.name)
         self.lblPhonetic.setText(word.phonetic)
         self.lblInterp.setText(word.interp)
@@ -105,9 +108,13 @@ class Window(QtGui.QMainWindow):
         self.helpMenu.addAction(self.aboutAction)
 
     def chooseLexicon(self):
-        filename = QtGui.QFileDialog.getOpenFileName(self, u'选择词库').toUtf8()
-        filename = unicode(filename, 'utf-8')
-        self.statusBar.showMessage(filename)
+        filePath = QtGui.QFileDialog.getOpenFileName(self, u'选择词库', './lexicons/').toUtf8()
+        if filePath:
+            filePath = unicode(filePath, 'utf-8')
+            self.statusBar.showMessage(filePath)
+            self.mainPanel.reciteManager.setLexicon(filePath)
+            self.mainPanel.nextWord()
+
 
     def statRecite(self):
         self.statDialog = StatDialog(self)
