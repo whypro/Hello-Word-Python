@@ -15,7 +15,7 @@ class DictManager:
         try:
             data = self.dictionary[wordName].decode('utf-8', 'ignore')
         except KeyError, e:
-            print '未找到单词：%s' % "".join(e.message)
+            print u'未找到单词：%s' % "".join(e.message)
             return None
         else:
             if data[0] == '*':
@@ -147,7 +147,7 @@ class ReciteManager:
     # 设置词库
     def setLexicon(self, lexPath):
         self.newWordManager = NewWordManager(lexPath, self.dictManager)
-        self.lexiconName = ''
+        self.lexiconName = os.path.basename(lexPath).split('.')[0]
 
     def getWord(self):
         return self.currentWord
@@ -193,24 +193,25 @@ class ReciteManager:
                     break
 
 if __name__ == '__main__':
-    # wordManager = WordManager(u'./考研英语.txt', 'stardict-langdao-ec-gb-2.4.2', 'langdao-ec-gb')
+    dictManager = DictManager('stardict-langdao-ec-gb-2.4.2', 'langdao-ec-gb')
     # for i in xrange(0, 10):
     #     word = wordManager.getRandomWord()
     #     print word.name
     #     print word.phonetic
     #     print word.interp
 
-    # recordManager = RecordManager('./recite.dat')
-    # print recordManager.records[0].wordName
-    # record = ReciteRecord('good')
-    # recordManager.records.append(record)
-    # recordManager.saveAllRecords()
+    recordManager = RecordManager('./record/recite.dat', dictManager)
+    for record in recordManager.records:
+        print record.wordName
+    record = ReciteRecord('good', 0, 0, 0, 0)
+    recordManager.records.append(record)
+    recordManager.saveRecords()
 
-    reciteManager = ReciteManager(u'./考研英语.txt', 'recite.dat', 'stardict-langdao-ec-gb-2.4.2', 'langdao-ec-gb')
-    reciteManager.getLexiconName()
-    reciteManager.nextWord()
-    print reciteManager.getWord().name
-    reciteManager.setReciteMode(ReciteManager.Modes.Review)
-    reciteManager.nextWord()
-    if not reciteManager.getWord():
-        print u'没有需要复习的单词'
+    # reciteManager = ReciteManager(u'./考研英语.txt', 'recite.dat', 'stardict-langdao-ec-gb-2.4.2', 'langdao-ec-gb')
+    # reciteManager.getLexiconName()
+    # reciteManager.nextWord()
+    # print reciteManager.getWord().name
+    # reciteManager.setReciteMode(ReciteManager.Modes.Review)
+    # reciteManager.nextWord()
+    # if not reciteManager.getWord():
+    #     print u'没有需要复习的单词'
