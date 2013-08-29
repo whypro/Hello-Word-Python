@@ -4,7 +4,7 @@ import os
 import time
 from PyQt4 import QtGui, QtCore
 from managers import ReciteManager
-
+import string
 
 class StatDialog(QtGui.QDialog):
     def __init__(self, parent=None, records=None):
@@ -36,6 +36,7 @@ class StatDialog(QtGui.QDialog):
         self.setLayout(layout)
         self.resize(600, 400)
 
+
 class Window(QtGui.QMainWindow):
     windowTitle = 'Hello Word'
 
@@ -62,6 +63,12 @@ class Window(QtGui.QMainWindow):
     # 字体
     fontDir = 'fonts/'
     phoneticFontName = 'lingoes.ttf'
+
+    acceptList = tuple(string.uppercase + string.lowercase + '-')
+
+    # 显示状态
+    class DisplayStatus:
+        Display, Input, Correct, Wrong = range(4)
 
     def __init__(self, parent=None):
         super(Window, self).__init__(parent)
@@ -95,6 +102,7 @@ class Window(QtGui.QMainWindow):
         width = height = screen.width() / 3
         self.resize(width, height)
         self.move((screen.width()-width)/2, (screen.height()-height)/2)
+        self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
     def initMenu(self):
         # 初始化菜单栏
@@ -168,7 +176,10 @@ class Window(QtGui.QMainWindow):
         self.lblWordName.setFont(QtGui.QFont('Times New Roman', 48, QtGui.QFont.Bold))
 
         self.nextButton = QtGui.QPushButton(u"下一个单词")
+        # self.nextButton.setDisabled(True)
+        self.nextButton.setFocusPolicy(QtCore.Qt.NoFocus)
         self.connect(self.nextButton, QtCore.SIGNAL('clicked()'), self.nextWord)
+        self.nextButton.setVisible(False)
 
         QtGui.QFontDatabase.addApplicationFont(os.path.join(self.fontDir, self.phoneticFontName))
         self.lblPhonetic = QtGui.QLabel()
@@ -177,8 +188,10 @@ class Window(QtGui.QMainWindow):
         self.lblInterp = QtGui.QTextEdit()
         self.lblInterp.setFont(QtGui.QFont(u'楷体', 20))
         self.lblInterp.setReadOnly(True)
+        self.lblInterp.setFocusPolicy(QtCore.Qt.NoFocus)
 
         self.mainPanel = QtGui.QWidget(self)
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
         self.mainPanel.layout = QtGui.QGridLayout(self.mainPanel)
 
         self.mainPanel.layout.addWidget(self.lblWordName, 0, 0)
@@ -190,13 +203,20 @@ class Window(QtGui.QMainWindow):
         self.setCentralWidget(self.mainPanel)
 
     def nextWord(self):
-        # self.sender()
+        sender = self.sender()
+        if sender:
+            self.statusBar.showMessage(sender.text())
         self.reciteManager.nextWord()
         word = self.reciteManager.getWord()
+        # 设置颜色
+        palette = QtGui.QPalette()
+        palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.black)
+        self.lblWordName.setPalette(palette)
         self.lblWordName.setText(word.name)
         self.lblPhonetic.setText(word.phonetic)
         self.lblInterp.setText(word.interp)
-
+        self.spelling = ''
+        self.displayStatus = self.DisplayStatus.Display
 
     def chooseLexicon(self):
         filePath = QtGui.QFileDialog.getOpenFileName(self, u'选择词库', self.lexiconDir).toUtf8()
@@ -207,7 +227,6 @@ class Window(QtGui.QMainWindow):
             windowTitle = self.windowTitle + ' | ' + self.reciteManager.getLexiconName()
             self.setWindowTitle(windowTitle)
             self.nextWord()
-
 
     def statRecite(self):
         records = self.reciteManager.recordManager.getRecords()
@@ -222,6 +241,66 @@ class Window(QtGui.QMainWindow):
         <p>版权所有&nbsp;&copy;&nbsp;2010-2013&nbsp;WHYPRO</p>
         """
         QtGui.QMessageBox.about(self, u'关于', aboutMessage)
+
+    def keyPressEvent(self, event):
+        # print self.displayStatus
+
+        # 当拼写正确时，忽略一次键盘事件，并产生新词
+        if self.displayStatus == self.DisplayStatus.Correct:
+            self.nextWord()
+            return
+
+        ch = event.text()
+        key = event.key()
+        # print ch, '=>', key
+
+        # Key_Space and Key_Enter 判断拼写是否正确
+        if key == QtCore.Qt.Key_Space or key == QtCore.Qt.Key_Return or key == QtCore.Qt.Key_Enter:
+            # 当拼写正确时，以蓝色字体显示，并设置 Correct 标志
+            if self.spelling == self.reciteManager.getWord().name:
+                self.displayStatus = self.DisplayStatus.Correct
+                # 设置颜色
+                palette = QtGui.QPalette()
+                palette.setColor(QtGui.QPalette.WindowText, QtGui.QColor(0x33, 0x99, 0xee))
+                self.lblWordName.setPalette(palette)
+                # 生成该单词背诵数据，并写入文件
+                self.reciteManager.saveRecord()
+            # 当拼写错误时，以红色字体显示，并设置 Wrong 标志
+            else:
+                if self.displayStatus != self.DisplayStatus.Wrong:
+                    # 防止陌生度连续增加
+                    self.reciteManager.increaseStrange()
+                    self.spelling = ""
+                    # 设置颜色
+                    palette = QtGui.QPalette()
+                    palette.setColor(QtGui.QPalette.WindowText, QtGui.QColor(0xff, 0x66, 0x66))
+                    self.lblWordName.setPalette(palette)
+                    self.lblWordName.setText(self.reciteManager.getWord().name)
+                    self.displayStatus = self.DisplayStatus.Wrong
+            return
+        # '`' 跳过该单词
+        if ch == '`':
+            self.nextWord()
+            return
+        # 合法输入
+        if ch in self.acceptList:
+            # 保证拼写长度小于单词长度
+            if len(self.spelling) < len(self.reciteManager.getWord().name):
+                self.spelling += ch
+                self.lblWordName.setText(self.spelling)
+                # 设置颜色
+                palette = QtGui.QPalette()
+                palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.black)
+                self.lblWordName.setPalette(palette)
+            self.displayStatus = self.DisplayStatus.Input
+            return
+        # 退格键删除最后一个字符
+        if key == QtCore.Qt.Key_Backspace:
+            if self.spelling:
+                self.spelling = self.spelling[0:-1]
+                self.lblWordName.setText(self.spelling)
+                self.displayStatus = self.DisplayStatus.Input
+            return
 
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
