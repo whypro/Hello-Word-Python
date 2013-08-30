@@ -36,7 +36,7 @@ class Ebbinghaus:
 
     # 根据记忆曲线，判断单词是否需要复习
     def needRecite(self, record):
-        self.isExpire(record)
+        return self.isExpire(record)
 
     def isExpire(self, record):
         # 记忆曲线完成
@@ -46,7 +46,7 @@ class Ebbinghaus:
             return False
 
         currentTime = time.time()
-        timeDiff = (currentTime - record.lastTime) / (1000 * 60)
+        timeDiff = (currentTime - record.lastTime) / 60     # 将单位从秒转换为分钟
         if timeDiff > self.forgettingCurve[record.stage]:
             return True
         else:

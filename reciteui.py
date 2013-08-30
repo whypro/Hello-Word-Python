@@ -2,14 +2,16 @@
 import sys
 import os
 import time
-from PyQt4 import QtGui, QtCore
+from PyQt4 import QtGui, QtCore, QtNetwork
 from managers import ReciteManager
 import string
+
 
 class StatDialog(QtGui.QDialog):
     def __init__(self, parent=None, records=None):
         super(StatDialog, self).__init__(parent)
-
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        self.setWindowTitle(u'词汇统计')
         tableWidget = QtGui.QTableWidget(len(records), 5, self)
 
         # 设置表头
@@ -34,34 +36,48 @@ class StatDialog(QtGui.QDialog):
         layout = QtGui.QGridLayout()
         layout.addWidget(tableWidget)
         self.setLayout(layout)
-        self.resize(600, 400)
+
+        # 根据屏幕大小设置窗口大小，并居中
+        screen = QtGui.QDesktopWidget().screenGeometry()
+        height = screen.height() / 3
+        self.setFixedHeight(height)
+        width = 600
+        self.setMinimumWidth(width)
+        self.move((screen.width()-width)/2, (screen.height()-height)/2)
+        self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
 
 class Window(QtGui.QMainWindow):
+    # 标题
     windowTitle = 'Hello Word'
 
+    # 版本
+    version = '0.2.0'
+
     # 词库
-    lexiconDir = 'lexicons/'
-    lexiconName = 'GRE.lxc'
+    lexiconDir = 'res/lexicons/'
+    lexiconName = 'CET6.lxc'
 
     # 图标
     iconDir = 'res/icons/'
     lexiconIconName = 'lexicon.png'
     statIconName = 'stat.png'
+    newWordIconName = 'new.png'
     reviewIconName = 'review.png'
     exitIconName = 'exit.png'
     aboutIconName = 'about.png'
     mainIconName = 'main.png'
+    sysTrayIconName = 'tray.png'
 
     # 记录
-    recordPath = 'records/recite.dat'
+    recordPath = 'record/recite.dat'
 
     # 字典
-    dictDir = 'dicts/stardict-langdao-ec-gb-2.4.2/'
+    dictDir = 'res/dicts/stardict-langdao-ec-gb-2.4.2/'
     dictPrefix = 'langdao-ec-gb'
 
     # 字体
-    fontDir = 'fonts/'
+    fontDir = 'res/fonts/'
     phoneticFontName = 'lingoes.ttf'
 
     acceptList = tuple(string.uppercase + string.lowercase + '-')
@@ -93,16 +109,26 @@ class Window(QtGui.QMainWindow):
             )
         )
 
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowCloseButtonHint)
+        self.setWindowFlags(
+            QtCore.Qt.CustomizeWindowHint |
+            QtCore.Qt.WindowMinimizeButtonHint |
+            QtCore.Qt.WindowCloseButtonHint
+        )
+
         self.initMainPanel()    # 初始化中央面板
 
         self.nextWord()
 
-         # 根据屏幕大小设置窗口大小，并居中
+        self.initSysTray()
+
+        # 根据屏幕大小设置窗口大小，并居中
         screen = QtGui.QDesktopWidget().screenGeometry()
         width = height = screen.width() / 3
-        self.resize(width, height)
+        self.setFixedSize(width, height)
         self.move((screen.width()-width)/2, (screen.height()-height)/2)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
+        # self.setWindowState(self.windowState() | QtCore.Qt.WindowFullScreen)  # 窗口全屏
 
     def initMenu(self):
         # 初始化菜单栏
@@ -129,15 +155,15 @@ class Window(QtGui.QMainWindow):
         self.connect(self.statAction, QtCore.SIGNAL('triggered()'), self.statRecite)
         self.fileMenu.addAction(self.statAction)
 
-        self.modeAction = QtGui.QAction(u'复习 (&R)', self)
-        self.modeAction.setStatusTip(u'复习')
-        self.modeAction.setIcon(
+        self.changeModeAction = QtGui.QAction(u'复习 (&R)', self)
+        self.changeModeAction.setStatusTip(u'复习')
+        self.changeModeAction.setIcon(
             QtGui.QIcon(
                 os.path.join(self.iconDir, self.reviewIconName)
             )
         )
-        self.connect(self.modeAction, QtCore.SIGNAL('triggered()'), self.changeReciteMode)
-        self.fileMenu.addAction(self.modeAction)
+        self.connect(self.changeModeAction, QtCore.SIGNAL('triggered()'), self.changeReciteMode)
+        self.fileMenu.addAction(self.changeModeAction)
 
         self.exitAction = QtGui.QAction(u'退出 (&X)', self)
         self.exitAction.setStatusTip(u'退出程序')
@@ -146,7 +172,7 @@ class Window(QtGui.QMainWindow):
                 os.path.join(self.iconDir, self.exitIconName)
             )
         )
-        self.connect(self.exitAction, QtCore.SIGNAL('triggered()'), self.close)
+        self.connect(self.exitAction, QtCore.SIGNAL('triggered()'), QtGui.qApp.quit)
         self.fileMenu.addAction(self.exitAction)
 
         self.helpMenu = self.menuBar.addMenu(u"帮助 (&H)")
@@ -165,7 +191,7 @@ class Window(QtGui.QMainWindow):
         self.toolBar = self.addToolBar(u'快捷栏')
         self.toolBar.addAction(self.chooseLexAction)
         self.toolBar.addAction(self.statAction)
-        self.toolBar.addAction(self.modeAction)
+        self.toolBar.addAction(self.changeModeAction)
         self.toolBar.addAction(self.aboutAction)
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.exitAction)
@@ -175,7 +201,7 @@ class Window(QtGui.QMainWindow):
         self.lblWordName = QtGui.QLabel()
         self.lblWordName.setFont(QtGui.QFont('Times New Roman', 48, QtGui.QFont.Bold))
 
-        self.nextButton = QtGui.QPushButton(u"下一个单词")
+        self.nextButton = QtGui.QPushButton(u'下一个单词')
         # self.nextButton.setDisabled(True)
         self.nextButton.setFocusPolicy(QtCore.Qt.NoFocus)
         self.connect(self.nextButton, QtCore.SIGNAL('clicked()'), self.nextWord)
@@ -190,24 +216,32 @@ class Window(QtGui.QMainWindow):
         self.lblInterp.setReadOnly(True)
         self.lblInterp.setFocusPolicy(QtCore.Qt.NoFocus)
 
-        self.mainPanel = QtGui.QWidget(self)
+        self.mainPanel = QtGui.QWidget()    # parent = self
         self.setFocusPolicy(QtCore.Qt.NoFocus)
         self.mainPanel.layout = QtGui.QGridLayout(self.mainPanel)
 
+        self.voiceButton = QtGui.QPushButton(u"发音")
+        self.nextButton.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.connect(self.nextButton, QtCore.SIGNAL('clicked()'), self.nextWord)
+
+        self.imageArea = QtGui.QPixmap()
         self.mainPanel.layout.addWidget(self.lblWordName, 0, 0)
         self.mainPanel.layout.addWidget(self.lblPhonetic, 1, 0)
-        self.mainPanel.layout.addWidget(self.lblInterp, 2, 0)
+        #self.mainPanel.layout.addWidget(self.voiceButton, 1, 1)
+        self.mainPanel.layout.addWidget(self.lblInterp, 2, 0, 1, 1)
         self.mainPanel.layout.addWidget(self.nextButton, 3, 0)
 
         self.mainPanel.setLayout(self.mainPanel.layout)
         self.setCentralWidget(self.mainPanel)
 
     def nextWord(self):
-        sender = self.sender()
-        if sender:
-            self.statusBar.showMessage(sender.text())
         self.reciteManager.nextWord()
         word = self.reciteManager.getWord()
+        if self.reciteManager.reciteMode == ReciteManager.Modes.Review and not word:
+            QtGui.QMessageBox.information(self, u'Hello Word', u'恭喜，没有需要复习的单词了~')
+            self.changeModeAction.trigger()
+            return
+
         # 设置颜色
         palette = QtGui.QPalette()
         palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.black)
@@ -217,6 +251,13 @@ class Window(QtGui.QMainWindow):
         self.lblInterp.setText(word.interp)
         self.spelling = ''
         self.displayStatus = self.DisplayStatus.Display
+        self.statusBar.showMessage(u'"`"键跳过该单词，空格键或回车键检查拼写，退格键修正拼写')
+
+        # import urllib2
+        # i = urllib2.urlopen('http://img1.51cto.com/attachment/200910/200910271256653086390.png').read()
+        # image = QtGui.QPixmap()
+        # image.convertFromImage(QtGui.QImage(i)
+        # self.lblWordName.setPixmap(image)
 
     def chooseLexicon(self):
         filePath = QtGui.QFileDialog.getOpenFileName(self, u'选择词库', self.lexiconDir).toUtf8()
@@ -234,12 +275,36 @@ class Window(QtGui.QMainWindow):
         self.statDialog.show()
 
     def changeReciteMode(self):
-        pass
+        sender = self.sender()
+        modeTo = unicode(sender.text().toUtf8(), 'utf-8')
+        if modeTo == u'学习 (&N)':
+            self.changeModeAction.setText(u'复习 (&R)')
+            self.changeModeAction.setStatusTip(u'复习')
+            self.changeModeAction.setIcon(
+                QtGui.QIcon(
+                    os.path.join(self.iconDir, self.reviewIconName)
+                )
+            )
+            self.reciteManager.setReciteMode(ReciteManager.Modes.New)
+            self.nextWord()
+        elif modeTo == u'复习 (&R)':
+            self.changeModeAction.setText(u'学习 (&N)')
+            self.changeModeAction.setStatusTip(u'学习')
+            self.changeModeAction.setIcon(
+                QtGui.QIcon(
+                    os.path.join(self.iconDir, self.newWordIconName)
+                )
+            )
+            self.reciteManager.setReciteMode(ReciteManager.Modes.Review)
+            self.nextWord()
 
     def about(self):
-        aboutMessage = u"""
-        <p>版权所有&nbsp;&copy;&nbsp;2010-2013&nbsp;WHYPRO</p>
-        """
+        aboutMessage = u'\
+        <p><strong>Hello Word</strong>&nbsp;%s&nbsp;\
+        <font color="red"><em>%s</em></font></p>\
+        <p>版权所有&nbsp;&copy;&nbsp;2010-2013&nbsp;WHYPRO</p>\
+        <p>献给：Q</p>' % (self.version, 'Alpha')
+
         QtGui.QMessageBox.about(self, u'关于', aboutMessage)
 
     def keyPressEvent(self, event):
@@ -302,9 +367,56 @@ class Window(QtGui.QMainWindow):
                 self.displayStatus = self.DisplayStatus.Input
             return
 
+    def initSysTray(self):
+        self.sysTrayMenu = QtGui.QMenu(self)
+        self.sysTrayMenu.addSeparator()
+        self.sysTrayMenu.addAction(self.exitAction)
+
+        self.sysTrayIcon = QtGui.QSystemTrayIcon(
+            QtGui.QIcon(os.path.join(self.iconDir, self.sysTrayIconName)),
+            self,
+        )
+        self.sysTrayIcon.activated.connect(self.iconActivated)
+        # self.connect(self.sysTrayIcon, QtCore.SIGNAL('activated()'), self.iconActivated)
+        self.sysTrayIcon.messageClicked.connect(self.messageClicked)
+        self.sysTrayIcon.setContextMenu(self.sysTrayMenu)
+
+    def iconActivated(self, reason):
+        if reason == QtGui.QSystemTrayIcon.Trigger:
+            self.show()
+            self.sysTrayIcon.hide()
+        elif reason == QtGui.QSystemTrayIcon.DoubleClick:
+            pass
+        elif reason == QtGui.QSystemTrayIcon.MiddleClick:
+            pass
+
+    def messageClicked(self):
+        pass
+
+    def closeEvent(self, event):
+        self.hide()
+        self.sysTrayIcon.show()
+        self.sysTrayIcon.showMessage(u"Hello Word", u"我在这里，点击我继续背单词哦~", QtGui.QSystemTrayIcon.NoIcon)
+        event.ignore()
+
+
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
+    # 显示 splash
+    iconDir = 'res/icons/'
+    splashIconName = 'splash.png'
+    splash = QtGui.QSplashScreen(QtGui.QPixmap(os.path.join(iconDir, splashIconName)))
+    splash.show()
+    splash.showMessage(u'孵化中...', QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter, QtCore.Qt.white)
+    # 主窗体
     m = Window()
+    splash.showMessage(u'孵化完成!', QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter, QtCore.Qt.white)
     m.show()
+    # 主窗体加载完成后释放
+    splash.finish(m)
+    del splash
     app.exec_()
 
+
+# TODO: 只运行一个实例
+# TODO: 复习提示

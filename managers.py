@@ -46,6 +46,9 @@ class RecordManager:
         self.loadRecords()
 
     def saveRecords(self):
+        dirname = os.path.dirname(self.recordPath)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
         f = open(self.recordPath, 'wb')
         pickle.dump(self.records, f)
         f.close()
@@ -57,6 +60,7 @@ class RecordManager:
             f.close()
             return True
         else:
+            print u'记录文件不存在'
             return False
 
     def getRecords(self):
@@ -67,7 +71,7 @@ class RecordManager:
             if r.wordName == record.wordName:
                 self.records.remove(r)
                 self.records.append(record)
-                break
+                return
         self.records.append(record)
 
     def getRandomRecord(self):
@@ -76,11 +80,11 @@ class RecordManager:
         needReciteRecords = []
         for record in self.records:
             if ebbinghaus.needRecite(record):
-                needReciteRecords.add(record)
+                needReciteRecords.append(record)
 
         # 从复习列表中随机取出单词
         if len(needReciteRecords) > 0:
-            wordName = random.choice(needReciteRecords).word
+            wordName = random.choice(needReciteRecords).wordName
             word = self.dictManager.getWordByName(wordName)
             return word
         else:
@@ -191,6 +195,7 @@ class ReciteManager:
                     )
                     self.recordManager.addRecord(reciteRecord)
                     break
+        self.recordManager.saveRecords()
 
 if __name__ == '__main__':
     dictManager = DictManager('stardict-langdao-ec-gb-2.4.2', 'langdao-ec-gb')
