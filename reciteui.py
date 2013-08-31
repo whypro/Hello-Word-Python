@@ -3,6 +3,7 @@ import sys
 import os
 import time
 from PyQt4 import QtGui, QtCore, QtNetwork
+from PyQt4.phonon import Phonon
 from managers import ReciteManager
 import string
 
@@ -12,35 +13,48 @@ class StatDialog(QtGui.QDialog):
         super(StatDialog, self).__init__(parent)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setWindowTitle(u'词汇统计')
-        tableWidget = QtGui.QTableWidget(len(records), 5, self)
 
+        tableWidget = QtGui.QTableWidget(len(records), 5, self)
         # 设置表头
-        tableWidget.setHorizontalHeaderItem(0, QtGui.QTableWidgetItem(u'单词'))
-        tableWidget.setHorizontalHeaderItem(1, QtGui.QTableWidgetItem(u'首次记忆时间'))
-        tableWidget.setHorizontalHeaderItem(2, QtGui.QTableWidgetItem(u'上次记忆时间'))
-        tableWidget.setHorizontalHeaderItem(3, QtGui.QTableWidgetItem(u'阶段'))
-        tableWidget.setHorizontalHeaderItem(4, QtGui.QTableWidgetItem(u'陌生度'))
+        tableWidget.setHorizontalHeaderLabels(
+            (u'单词', u'首次记忆时间', u'上次记忆时间', u'阶段', u'陌生度')
+        )
+        tableWidget.verticalHeader().setVisible(False)
 
         for row in xrange(len(records)):
-            tableItems = []
-            tableItems.append(QtGui.QTableWidgetItem(records[row].wordName))
-            tableItems.append(QtGui.QTableWidgetItem(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(records[row].startTime))))
-            tableItems.append(QtGui.QTableWidgetItem(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(records[row].lastTime))))
-            tableItems.append(QtGui.QTableWidgetItem(str(records[row].stage)))
-            tableItems.append(QtGui.QTableWidgetItem(str(records[row].strange)))
+            tableItemData = [
+                records[row].wordName,
+                time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(records[row].startTime)),
+                time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(records[row].lastTime)),
+                str(records[row].stage),
+                str(records[row].strange),
+            ]
 
-            for col in xrange(len(tableItems)):
-                tableItems[col].setFlags(QtCore.Qt.ItemIsEnabled)
-                tableWidget.setItem(row, col, tableItems[col])
+            for col in xrange(len(tableItemData)):
+                tableItem = QtGui.QTableWidgetItem(tableItemData[col])
+                tableItem.setFlags(QtCore.Qt.ItemIsEnabled)
+                tableWidget.setItem(row, col, tableItem)
 
-        layout = QtGui.QGridLayout()
-        layout.addWidget(tableWidget)
+        # 重设列宽
+        tableWidget.resizeColumnToContents(1)
+        tableWidget.resizeColumnToContents(2)
+        tableWidget.horizontalHeader().setStretchLastSection(True)
+        # 取消表格边框
+        # tableWidget.setWindowFlags(QtCore.Qt.FramelessWindowHint)
+        tabWidget = QtGui.QTabWidget()
+        tabWidget.addTab(tableWidget, u'记忆中')
+
+        #buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok)
+
+        layout = QtGui.QVBoxLayout()
+        layout.addWidget(tabWidget)
+        #layout.addWidget(buttonBox)
         self.setLayout(layout)
 
         # 根据屏幕大小设置窗口大小，并居中
         screen = QtGui.QDesktopWidget().screenGeometry()
-        height = screen.height() / 3
-        self.setFixedHeight(height)
+        height = screen.height() / 2
+        self.setMinimumHeight(height)
         width = 600
         self.setMinimumWidth(width)
         self.move((screen.width()-width)/2, (screen.height()-height)/2)
@@ -52,7 +66,7 @@ class Window(QtGui.QMainWindow):
     windowTitle = 'Hello Word'
 
     # 版本
-    version = '0.2.0'
+    version = '0.2.1'
 
     # 词库
     lexiconDir = 'res/lexicons/'
@@ -68,6 +82,7 @@ class Window(QtGui.QMainWindow):
     aboutIconName = 'about.png'
     mainIconName = 'main.png'
     sysTrayIconName = 'tray.png'
+    configIconName = 'config.png'
 
     # 记录
     recordPath = 'record/recite.dat'
@@ -118,6 +133,8 @@ class Window(QtGui.QMainWindow):
 
         self.initMainPanel()    # 初始化中央面板
 
+        self.initVoice()
+
         self.nextWord()
 
         self.initSysTray()
@@ -165,6 +182,16 @@ class Window(QtGui.QMainWindow):
         self.connect(self.changeModeAction, QtCore.SIGNAL('triggered()'), self.changeReciteMode)
         self.fileMenu.addAction(self.changeModeAction)
 
+        self.configureAction = QtGui.QAction(u'设置 (&O)', self)
+        self.configureAction.setStatusTip(u'设置')
+        self.configureAction.setIcon(
+            QtGui.QIcon(
+                os.path.join(self.iconDir, self.configIconName)
+            )
+        )
+        self.connect(self.configureAction, QtCore.SIGNAL('triggered()'), self.configureSettings)
+        self.fileMenu.addAction(self.configureAction)
+
         self.exitAction = QtGui.QAction(u'退出 (&X)', self)
         self.exitAction.setStatusTip(u'退出程序')
         self.exitAction.setIcon(
@@ -192,20 +219,22 @@ class Window(QtGui.QMainWindow):
         self.toolBar.addAction(self.chooseLexAction)
         self.toolBar.addAction(self.statAction)
         self.toolBar.addAction(self.changeModeAction)
-        self.toolBar.addAction(self.aboutAction)
+        self.toolBar.addAction(self.configureAction)
         self.toolBar.addSeparator()
-        self.toolBar.addAction(self.exitAction)
+        self.toolBar.addAction(self.aboutAction)
+        #self.toolBar.addSeparator()
+        #self.toolBar.addAction(self.exitAction)
         self.toolBar.setFloatable(False)
 
     def initMainPanel(self):
         self.lblWordName = QtGui.QLabel()
         self.lblWordName.setFont(QtGui.QFont('Times New Roman', 48, QtGui.QFont.Bold))
 
-        self.nextButton = QtGui.QPushButton(u'下一个单词')
+        #self.nextButton = QtGui.QPushButton(u'下一个单词')
         # self.nextButton.setDisabled(True)
-        self.nextButton.setFocusPolicy(QtCore.Qt.NoFocus)
-        self.connect(self.nextButton, QtCore.SIGNAL('clicked()'), self.nextWord)
-        self.nextButton.setVisible(False)
+        #self.nextButton.setFocusPolicy(QtCore.Qt.NoFocus)
+        #self.connect(self.nextButton, QtCore.SIGNAL('clicked()'), self.nextWord)
+        #self.nextButton.setVisible(False)
 
         QtGui.QFontDatabase.addApplicationFont(os.path.join(self.fontDir, self.phoneticFontName))
         self.lblPhonetic = QtGui.QLabel()
@@ -220,19 +249,24 @@ class Window(QtGui.QMainWindow):
         self.setFocusPolicy(QtCore.Qt.NoFocus)
         self.mainPanel.layout = QtGui.QGridLayout(self.mainPanel)
 
-        self.voiceButton = QtGui.QPushButton(u"发音")
-        self.nextButton.setFocusPolicy(QtCore.Qt.NoFocus)
-        self.connect(self.nextButton, QtCore.SIGNAL('clicked()'), self.nextWord)
+        #self.voiceButton = QtGui.QPushButton(u"发音")
+        #self.voiceButton.setFocusPolicy(QtCore.Qt.NoFocus)
+        #self.connect(self.voiceButton, QtCore.SIGNAL('clicked()'), self.nextWord)
 
         self.imageArea = QtGui.QPixmap()
         self.mainPanel.layout.addWidget(self.lblWordName, 0, 0)
         self.mainPanel.layout.addWidget(self.lblPhonetic, 1, 0)
         #self.mainPanel.layout.addWidget(self.voiceButton, 1, 1)
         self.mainPanel.layout.addWidget(self.lblInterp, 2, 0, 1, 1)
-        self.mainPanel.layout.addWidget(self.nextButton, 3, 0)
+        #self.mainPanel.layout.addWidget(self.nextButton, 3, 0)
 
         self.mainPanel.setLayout(self.mainPanel.layout)
         self.setCentralWidget(self.mainPanel)
+
+    def initVoice(self):
+        self.mediaObject = Phonon.MediaObject()
+        self.audioOutput = Phonon.AudioOutput(Phonon.MusicCategory)
+        Phonon.createPath(self.mediaObject, self.audioOutput);
 
     def nextWord(self):
         self.reciteManager.nextWord()
@@ -258,6 +292,16 @@ class Window(QtGui.QMainWindow):
         # image = QtGui.QPixmap()
         # image.convertFromImage(QtGui.QImage(i)
         # self.lblWordName.setPixmap(image)
+
+        # 发音
+        # voiceUrl = self.reciteManager.getVoiceUrl()
+        # QtCore.QUrl(voiceUrl)
+        mediaSource = Phonon.MediaSource(r'C:\Users\whypro\Desktop\24.mp3')
+        self.mediaObject.setCurrentSource(mediaSource)
+        self.mediaObject.play()
+
+    def configureSettings(self):
+        pass
 
     def chooseLexicon(self):
         filePath = QtGui.QFileDialog.getOpenFileName(self, u'选择词库', self.lexiconDir).toUtf8()
@@ -394,29 +438,81 @@ class Window(QtGui.QMainWindow):
         pass
 
     def closeEvent(self, event):
-        self.hide()
-        self.sysTrayIcon.show()
-        self.sysTrayIcon.showMessage(u"Hello Word", u"我在这里，点击我继续背单词哦~", QtGui.QSystemTrayIcon.NoIcon)
-        event.ignore()
+        if not QtGui.QSystemTrayIcon.isSystemTrayAvailable():
+            event.accept()
+        else:
+            self.hide()
+            self.sysTrayIcon.show()
+            self.sysTrayIcon.showMessage(u"Hello Word", u"我在这里，点击我继续背单词哦～", QtGui.QSystemTrayIcon.NoIcon)
+            event.ignore()
 
+
+class SingleApplication(QtGui.QApplication):
+    def __init__(self, argv):
+        super(SingleApplication, self).__init__(argv)
+        self.isSingle = True
+
+        self.setApplicationName('HelloWord')
+        serverName = self.applicationName()
+        socket = QtNetwork.QLocalSocket()
+        socket.connectToServer(serverName)
+        if socket.waitForConnected(1000):
+            # print u'已存在一个实例'
+            self.isSingle = False
+            return
+        # print u'建立本地服务器'
+        self.server = QtNetwork.QLocalServer(self)
+        # self.server.listen(serverName)
+        self.connect(self.server, QtCore.SIGNAL('newConnection()'), self.newLocalConnection)
+        if not self.server.listen(serverName):
+            #     print '听'
+            # 防止程序崩溃时,残留进程服务,移除之
+            # 确保监听成功
+            if self.server.serverError() == QtNetwork.QAbstractSocket.AddressInUseError and \
+                    QtCore.QFile.exists(self.server.serverName()):
+                QtCore.QFile.remove(self.server.serverName())
+        #       print u'什么情况？'
+                self.server.listen(serverName)
+
+    def newLocalConnection(self):
+        #self.activeWindow().show()
+        socket = self.server.nextPendingConnection()
+        if not socket:
+            return
+        # 其他处理
+
+    def isSingle(self):
+        return self.isSingle
 
 if __name__ == '__main__':
-    app = QtGui.QApplication(sys.argv)
-    # 显示 splash
     iconDir = 'res/icons/'
     splashIconName = 'splash.png'
-    splash = QtGui.QSplashScreen(QtGui.QPixmap(os.path.join(iconDir, splashIconName)))
-    splash.show()
-    splash.showMessage(u'孵化中...', QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter, QtCore.Qt.white)
-    # 主窗体
-    m = Window()
-    splash.showMessage(u'孵化完成!', QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter, QtCore.Qt.white)
-    m.show()
-    # 主窗体加载完成后释放
-    splash.finish(m)
-    del splash
-    app.exec_()
+    mainIconName = 'main.png'
+
+    app = SingleApplication(sys.argv)
+    if not app.isSingle:
+        QtGui.QMessageBox.information(
+            None,
+            "Hello Word",
+            u"程序已经在运行了哦~",
+        )
+        app.quit()
+    else:
+        # 显示 splash
+        splash = QtGui.QSplashScreen(QtGui.QPixmap(os.path.join(iconDir, splashIconName)))
+        splash.show()
+        splash.showMessage(u'孵化中...', QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter, QtCore.Qt.white)
+        # 主窗体
+        m = Window()
+        splash.showMessage(u'孵化完成!', QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter, QtCore.Qt.white)
+        m.show()
+        # 主窗体加载完成后释放
+        splash.finish(m)
+        del splash
+        app.exec_()
 
 
 # TODO: 只运行一个实例
 # TODO: 复习提示
+# TODO: 单词发音
+# TODO: 设置

@@ -156,6 +156,9 @@ class ReciteManager:
     def getWord(self):
         return self.currentWord
 
+    def getVoiceUrl(self):
+        return '%s' % self.currentWord.name
+
     def nextWord(self):
         if self.reciteMode == self.Modes.New:
             while True:
