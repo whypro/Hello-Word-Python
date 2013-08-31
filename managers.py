@@ -4,7 +4,10 @@ import time
 import random
 from pystardict import Dictionary
 from models import Word, ReciteRecord, Ebbinghaus
-import pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 
 
 class DictManager:
@@ -157,7 +160,9 @@ class ReciteManager:
         return self.currentWord
 
     def getVoiceUrl(self):
-        return '%s' % self.currentWord.name
+        googleTTS = 'http://translate.google.com/translate_tts?q=%s&tl=en' % self.currentWord.name
+        voiceUrl = 'http://www.gstatic.com/dictionary/static/sounds/de/0/%s.mp3' % self.currentWord.name
+        return voiceUrl, googleTTS
 
     def nextWord(self):
         if self.reciteMode == self.Modes.New:

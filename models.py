@@ -51,3 +51,12 @@ class Ebbinghaus:
             return True
         else:
             return False
+
+
+class Settings:
+    class VoiceGender:
+        (Male, Female) = range(2)
+
+    def __init__(self):
+        self.autoPlayVoice = True   # 自动发音
+        self.voiceGender = self.VoiceGender.Male

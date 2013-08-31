@@ -5,6 +5,7 @@ import time
 from PyQt4 import QtGui, QtCore, QtNetwork
 from PyQt4.phonon import Phonon
 from managers import ReciteManager
+from models import Settings
 import string
 
 
@@ -20,6 +21,7 @@ class StatDialog(QtGui.QDialog):
             (u'单词', u'首次记忆时间', u'上次记忆时间', u'阶段', u'陌生度')
         )
         tableWidget.verticalHeader().setVisible(False)
+        tableWidget.horizontalHeader().setHighlightSections(False)  # 禁止表头高亮
 
         for row in xrange(len(records)):
             tableItemData = [
@@ -32,23 +34,32 @@ class StatDialog(QtGui.QDialog):
 
             for col in xrange(len(tableItemData)):
                 tableItem = QtGui.QTableWidgetItem(tableItemData[col])
-                tableItem.setFlags(QtCore.Qt.ItemIsEnabled)
+                tableItem.setTextAlignment(QtCore.Qt.AlignCenter)
+                #tableItem.setFlags(QtCore.Qt.ItemIsEnabled)
                 tableWidget.setItem(row, col, tableItem)
 
+        tableWidget.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)     # 禁止编辑
+        tableWidget.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)    # 整行选中的方式
+        tableWidget.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)   # 设置为只能选中单个目标
+        tableWidget.setSortingEnabled(True)
         # 重设列宽
         tableWidget.resizeColumnToContents(1)
         tableWidget.resizeColumnToContents(2)
+        tableWidget.resizeRowsToContents()
         tableWidget.horizontalHeader().setStretchLastSection(True)
         # 取消表格边框
         # tableWidget.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         tabWidget = QtGui.QTabWidget()
         tabWidget.addTab(tableWidget, u'记忆中')
 
-        #buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok)
+        buttonBox = QtGui.QDialogButtonBox(parent=self)
+        buttonBox.setOrientation(QtCore.Qt.Horizontal)      # 设置为水平方向
+        buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Ok)
+        buttonBox.accepted.connect(self.accept)
 
         layout = QtGui.QVBoxLayout()
         layout.addWidget(tabWidget)
-        #layout.addWidget(buttonBox)
+        layout.addWidget(buttonBox)
         self.setLayout(layout)
 
         # 根据屏幕大小设置窗口大小，并居中
@@ -59,6 +70,54 @@ class StatDialog(QtGui.QDialog):
         self.setMinimumWidth(width)
         self.move((screen.width()-width)/2, (screen.height()-height)/2)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
+
+
+class SettingsDialog(QtGui.QDialog):
+    def __init__(self, parent=None, settings=None):
+        super(SettingsDialog, self).__init__(parent)
+
+        self.settings = settings
+
+        voiceGroup = QtGui.QGroupBox(u'发音设置')
+
+        self.autoPlayCheck = QtGui.QCheckBox(u'自动朗读单词')
+        voiceGenderLabel = QtGui.QLabel(u'朗读模式')
+        self.voiceGenderCombo = QtGui.QComboBox()
+        self.voiceGenderCombo.addItems([u'男声', u'女声'])
+
+        voiceGenderLayout = QtGui.QHBoxLayout()
+        voiceGenderLayout.addWidget(voiceGenderLabel)
+        voiceGenderLayout.addWidget(self.voiceGenderCombo)
+
+        voiceLayout = QtGui.QVBoxLayout()
+        voiceLayout.addWidget(self.autoPlayCheck)
+        voiceLayout.addLayout(voiceGenderLayout)
+        voiceGroup.setLayout(voiceLayout)
+
+        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel, QtCore.Qt.Horizontal, self)
+        buttonBox.accepted.connect(self.accept)
+        buttonBox.rejected.connect(self.reject)
+
+        self.initConfig()
+
+        mainLayout = QtGui.QVBoxLayout()
+        mainLayout.addWidget(voiceGroup)
+        mainLayout.addWidget(buttonBox)
+        mainLayout.addStretch(1)
+
+        self.setLayout(mainLayout)
+
+    def initConfig(self):
+        self.autoPlayCheck.setChecked(self.settings.autoPlayVoice)
+        self.voiceGenderCombo.setCurrentIndex(self.settings.voiceGender)
+
+    def accept(self):
+        # 保存配置
+        self.settings.autoPlayVoice = self.autoPlayCheck.isChecked()
+        self.settings.voiceGender = self.voiceGenderCombo.currentIndex()
+        print self.settings.autoPlayVoice
+        print self.settings.voiceGender
+        super(SettingsDialog, self).accept()
 
 
 class Window(QtGui.QMainWindow):
@@ -82,7 +141,7 @@ class Window(QtGui.QMainWindow):
     aboutIconName = 'about.png'
     mainIconName = 'main.png'
     sysTrayIconName = 'tray.png'
-    configIconName = 'config.png'
+    settingsIconName = 'config.png'
 
     # 记录
     recordPath = 'record/recite.dat'
@@ -115,6 +174,8 @@ class Window(QtGui.QMainWindow):
             self.dictDir,
             self.dictPrefix
         )
+
+        self.settings = Settings()
 
         windowTitle = self.windowTitle + ' | ' + self.reciteManager.getLexiconName()
         self.setWindowTitle(windowTitle)
@@ -159,7 +220,7 @@ class Window(QtGui.QMainWindow):
                 os.path.join(self.iconDir, self.lexiconIconName)
             )
         )
-        self.connect(self.chooseLexAction, QtCore.SIGNAL('triggered()'), self.chooseLexicon)
+        self.chooseLexAction.triggered.connect(self.chooseLexicon)
         self.fileMenu.addAction(self.chooseLexAction)
 
         self.statAction = QtGui.QAction(u'词汇统计 (&S)', self)
@@ -169,7 +230,7 @@ class Window(QtGui.QMainWindow):
                 os.path.join(self.iconDir, self.statIconName)
             )
         )
-        self.connect(self.statAction, QtCore.SIGNAL('triggered()'), self.statRecite)
+        self.statAction.triggered.connect(self.statRecite)
         self.fileMenu.addAction(self.statAction)
 
         self.changeModeAction = QtGui.QAction(u'复习 (&R)', self)
@@ -179,18 +240,18 @@ class Window(QtGui.QMainWindow):
                 os.path.join(self.iconDir, self.reviewIconName)
             )
         )
-        self.connect(self.changeModeAction, QtCore.SIGNAL('triggered()'), self.changeReciteMode)
+        self.changeModeAction.triggered.connect(self.changeReciteMode)
         self.fileMenu.addAction(self.changeModeAction)
 
-        self.configureAction = QtGui.QAction(u'设置 (&O)', self)
-        self.configureAction.setStatusTip(u'设置')
-        self.configureAction.setIcon(
+        self.settingsAction = QtGui.QAction(u'设置 (&O)', self)
+        self.settingsAction.setStatusTip(u'设置')
+        self.settingsAction.setIcon(
             QtGui.QIcon(
-                os.path.join(self.iconDir, self.configIconName)
+                os.path.join(self.iconDir, self.settingsIconName)
             )
         )
-        self.connect(self.configureAction, QtCore.SIGNAL('triggered()'), self.configureSettings)
-        self.fileMenu.addAction(self.configureAction)
+        self.settingsAction.triggered.connect(self.configureSettings)
+        self.fileMenu.addAction(self.settingsAction)
 
         self.exitAction = QtGui.QAction(u'退出 (&X)', self)
         self.exitAction.setStatusTip(u'退出程序')
@@ -199,7 +260,7 @@ class Window(QtGui.QMainWindow):
                 os.path.join(self.iconDir, self.exitIconName)
             )
         )
-        self.connect(self.exitAction, QtCore.SIGNAL('triggered()'), QtGui.qApp.quit)
+        self.exitAction.triggered.connect(QtGui.qApp.quit)
         self.fileMenu.addAction(self.exitAction)
 
         self.helpMenu = self.menuBar.addMenu(u"帮助 (&H)")
@@ -211,7 +272,7 @@ class Window(QtGui.QMainWindow):
                 os.path.join(self.iconDir, self.aboutIconName)
             )
         )
-        self.connect(self.aboutAction, QtCore.SIGNAL('triggered()'), self.about)
+        self.aboutAction.triggered.connect(self.about)
         self.helpMenu.addAction(self.aboutAction)
 
     def initToolbar(self):
@@ -219,7 +280,7 @@ class Window(QtGui.QMainWindow):
         self.toolBar.addAction(self.chooseLexAction)
         self.toolBar.addAction(self.statAction)
         self.toolBar.addAction(self.changeModeAction)
-        self.toolBar.addAction(self.configureAction)
+        self.toolBar.addAction(self.settingsAction)
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.aboutAction)
         #self.toolBar.addSeparator()
@@ -266,7 +327,7 @@ class Window(QtGui.QMainWindow):
     def initVoice(self):
         self.mediaObject = Phonon.MediaObject()
         self.audioOutput = Phonon.AudioOutput(Phonon.MusicCategory)
-        Phonon.createPath(self.mediaObject, self.audioOutput);
+        Phonon.createPath(self.mediaObject, self.audioOutput)
 
     def nextWord(self):
         self.reciteManager.nextWord()
@@ -285,7 +346,7 @@ class Window(QtGui.QMainWindow):
         self.lblInterp.setText(word.interp)
         self.spelling = ''
         self.displayStatus = self.DisplayStatus.Display
-        self.statusBar.showMessage(u'"`"键跳过该单词，空格键或回车键检查拼写，退格键修正拼写')
+        self.statusBar.showMessage(u'"."键跳过该单词，"/"键发音，空格键或回车键检查拼写，退格键修正拼写')
 
         # import urllib2
         # i = urllib2.urlopen('http://img1.51cto.com/attachment/200910/200910271256653086390.png').read()
@@ -294,14 +355,20 @@ class Window(QtGui.QMainWindow):
         # self.lblWordName.setPixmap(image)
 
         # 发音
-        # voiceUrl = self.reciteManager.getVoiceUrl()
-        # QtCore.QUrl(voiceUrl)
-        mediaSource = Phonon.MediaSource(r'C:\Users\whypro\Desktop\24.mp3')
+        if self.settings.autoPlayVoice:
+            self.playWord()
+
+    def playWord(self):
+        self.mediaObject.stop()
+        # voiceUrl, googleTTS = self.reciteManager.getVoiceUrl()
+        voiceGender = self.reciteManager.getVoiceUrl()
+        mediaSource = Phonon.MediaSource(QtCore.QUrl(voiceGender[self.settings.voiceGender]))
         self.mediaObject.setCurrentSource(mediaSource)
         self.mediaObject.play()
 
     def configureSettings(self):
-        pass
+        settingsDialog = SettingsDialog(self, self.settings)
+        settingsDialog.show()
 
     def chooseLexicon(self):
         filePath = QtGui.QFileDialog.getOpenFileName(self, u'选择词库', self.lexiconDir).toUtf8()
@@ -387,9 +454,13 @@ class Window(QtGui.QMainWindow):
                     self.lblWordName.setText(self.reciteManager.getWord().name)
                     self.displayStatus = self.DisplayStatus.Wrong
             return
-        # '`' 跳过该单词
-        if ch == '`':
+        # '.' 跳过该单词
+        if ch == '.':
             self.nextWord()
+            return
+        # '/' 发音
+        if ch == '/':
+            self.playWord()
             return
         # 合法输入
         if ch in self.acceptList:
@@ -434,6 +505,7 @@ class Window(QtGui.QMainWindow):
         elif reason == QtGui.QSystemTrayIcon.MiddleClick:
             pass
 
+    # 点击系统托盘信息的响应处理
     def messageClicked(self):
         pass
 
@@ -463,7 +535,7 @@ class SingleApplication(QtGui.QApplication):
         # print u'建立本地服务器'
         self.server = QtNetwork.QLocalServer(self)
         # self.server.listen(serverName)
-        self.connect(self.server, QtCore.SIGNAL('newConnection()'), self.newLocalConnection)
+        self.server.newConnection.connect(self.newLocalConnection)
         if not self.server.listen(serverName):
             #     print '听'
             # 防止程序崩溃时,残留进程服务,移除之
@@ -512,7 +584,8 @@ if __name__ == '__main__':
         app.exec_()
 
 
-# TODO: 只运行一个实例
+# DONE: 只运行一个实例
 # TODO: 复习提示
-# TODO: 单词发音
+# DONE: 单词发音
 # TODO: 设置
+# TODO: 词汇统计，确定按钮，曲线
