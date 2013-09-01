@@ -79,15 +79,12 @@ class RecordManager:
 
     def getRandomRecord(self):
         # 将需要背诵的单词加入 needReciteRecords 列表
-        ebbinghaus = Ebbinghaus()
-        needReciteRecords = []
-        for record in self.records:
-            if ebbinghaus.needRecite(record):
-                needReciteRecords.append(record)
+        ebbinghaus = Ebbinghaus(self.records)
+        needReciteWords = ebbinghaus.getNeedReciteWords()
 
         # 从复习列表中随机取出单词
-        if len(needReciteRecords) > 0:
-            wordName = random.choice(needReciteRecords).wordName
+        if len(needReciteWords) > 0:
+            wordName = random.choice(needReciteWords).wordName
             word = self.dictManager.getWordByName(wordName)
             return word
         else:
@@ -204,6 +201,41 @@ class ReciteManager:
                     self.recordManager.addRecord(reciteRecord)
                     break
         self.recordManager.saveRecords()
+
+
+class SettingsManager:
+    class VoiceGender:
+        (Male, Female) = range(2)
+
+    def __init__(self, settingsPath):
+        self.settingsPath = settingsPath
+        if not self.loadSettings():
+            self.initSettings()
+
+    def initSettings(self):
+        self.settings = {}
+        self.settings['autoPlayVoice'] = True   # 自动发音
+        self.settings['voiceGender'] = self.VoiceGender.Male
+        self.settings['firstTime'] = True       # 首次启动
+
+    def saveSettings(self):
+        dirname = os.path.dirname(self.settingsPath)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+        f = open(self.settingsPath, 'wb')
+        pickle.dump(self.settings, f)
+        f.close()
+
+    def loadSettings(self):
+        if os.path.exists(self.settingsPath):
+            f = open(self.settingsPath, 'rb')
+            self.settings = pickle.load(f)
+            f.close()
+            return True
+        else:
+            print u'记录文件不存在'
+            return False
+
 
 if __name__ == '__main__':
     dictManager = DictManager('stardict-langdao-ec-gb-2.4.2', 'langdao-ec-gb')

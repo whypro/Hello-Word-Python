@@ -31,8 +31,9 @@ class Ebbinghaus:
         15*24*60,    # 15天
     )
 
-    def __init__(self):
-        pass
+    def __init__(self, records):
+        self.records = records
+        self.neeReciteWords = []
 
     # 根据记忆曲线，判断单词是否需要复习
     def needRecite(self, record):
@@ -52,11 +53,8 @@ class Ebbinghaus:
         else:
             return False
 
-
-class Settings:
-    class VoiceGender:
-        (Male, Female) = range(2)
-
-    def __init__(self):
-        self.autoPlayVoice = True   # 自动发音
-        self.voiceGender = self.VoiceGender.Male
+    def getNeedReciteWords(self):
+        for record in self.records:
+            if self.needRecite(record):
+                self.neeReciteWords.append(record)
+        return self.neeReciteWords
