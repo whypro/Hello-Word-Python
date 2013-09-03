@@ -47,6 +47,7 @@ class RecordManager:
         self.dictManager = dictManager
         self.records = []
         self.loadRecords()
+        self.ebbinghaus = Ebbinghaus(self.records)
 
     def saveRecords(self):
         dirname = os.path.dirname(self.recordPath)
@@ -79,8 +80,7 @@ class RecordManager:
 
     def getRandomRecord(self):
         # 将需要背诵的单词加入 needReciteRecords 列表
-        ebbinghaus = Ebbinghaus(self.records)
-        needReciteWords = ebbinghaus.getNeedReciteWords()
+        needReciteWords = self.ebbinghaus.getNeedReciteWords()
 
         # 从复习列表中随机取出单词
         if len(needReciteWords) > 0:
@@ -217,6 +217,7 @@ class SettingsManager:
         self.settings['autoPlayVoice'] = True   # 自动发音
         self.settings['voiceGender'] = self.VoiceGender.Male
         self.settings['firstTime'] = True       # 首次启动
+        self.settings['reciteHintInterval'] = 300   # 复习间隔，秒
 
     def saveSettings(self):
         dirname = os.path.dirname(self.settingsPath)
@@ -235,6 +236,32 @@ class SettingsManager:
         else:
             print u'记录文件不存在'
             return False
+
+
+from threading import Thread
+from PyQt4 import QtGui
+
+
+# 复习提示，在系统托盘显示提示消息
+class EbbinghausManager(Thread):
+    def __init__(self, window):
+        super(EbbinghausManager, self).__init__()
+        self.window = window
+        self.setDaemon(True)
+
+    def run(self):
+        time.sleep(60)
+        while True:
+            needReciteWords = self.window.reciteManager.recordManager.ebbinghaus.getNeedReciteWords()
+            count = len(needReciteWords)
+            if count:
+                self.window.sysTrayIcon.showMessage(
+                    u"复习提示",
+                    u"您有%d个单词需要复习，点击我开始复习哦～" % count,
+                    QtGui.QSystemTrayIcon.NoIcon
+                )
+            print self.window.settingsManager.settings['reciteHintInterval']
+            time.sleep(self.window.settingsManager.settings['reciteHintInterval'])
 
 
 if __name__ == '__main__':

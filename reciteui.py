@@ -140,7 +140,7 @@ class Window(QtGui.QMainWindow):
     windowTitle = 'Hello Word'
 
     # 版本
-    version = '0.2.2'
+    version = '0.2.2.1'
 
     # 词库
     lexiconDir = 'res/lexicons/'
@@ -201,6 +201,10 @@ class Window(QtGui.QMainWindow):
         self.nextWord()
         self.initSysTray()
         self.initWindow()
+
+        from managers import EbbinghausManager
+        self.ebbinghausManager = EbbinghausManager(self)
+        self.ebbinghausManager.start()
 
     def initWindow(self):
         windowTitle = self.windowTitle + ' | ' + self.reciteManager.getLexiconName()
@@ -321,19 +325,15 @@ class Window(QtGui.QMainWindow):
     def initMainPanel(self):
         self.lblWordName = QtGui.QLabel()
         self.lblWordName.setFont(QtGui.QFont('Times New Roman', 48, QtGui.QFont.Bold))
-
-        #self.nextButton = QtGui.QPushButton(u'下一个单词')
-        # self.nextButton.setDisabled(True)
-        #self.nextButton.setFocusPolicy(QtCore.Qt.NoFocus)
-        #self.connect(self.nextButton, QtCore.SIGNAL('clicked()'), self.nextWord)
-        #self.nextButton.setVisible(False)
+        # self.lblWordName.setAlignment(QtCore.Qt.AlignHCenter)
 
         QtGui.QFontDatabase.addApplicationFont(os.path.join(self.fontDir, self.phoneticFontName))
         self.lblPhonetic = QtGui.QLabel()
         self.lblPhonetic.setFont(QtGui.QFont('Lingoes Unicode', 14))
+        # self.lblPhonetic.setAlignment(QtCore.Qt.AlignHCenter)
 
         self.lblInterp = QtGui.QTextEdit()
-        self.lblInterp.setFont(QtGui.QFont(u'楷体', 20))
+        self.lblInterp.setFont(QtGui.QFont(u'华文中宋', 20))
         self.lblInterp.setReadOnly(True)
         self.lblInterp.setFocusPolicy(QtCore.Qt.NoFocus)
 
@@ -419,29 +419,36 @@ class Window(QtGui.QMainWindow):
         self.statDialog = StatDialog(self, records)
         self.statDialog.show()
 
+    def changeModeToNew(self):
+        self.changeModeAction.setText(u'复习 (&R)')
+        self.changeModeAction.setStatusTip(u'复习')
+        self.changeModeAction.setIcon(
+            QtGui.QIcon(
+                os.path.join(self.iconDir, self.reviewIconName)
+            )
+        )
+        self.reciteManager.setReciteMode(ReciteManager.Modes.New)
+        self.nextWord()
+
+    def changeModeToReview(self):
+        self.changeModeAction.setText(u'学习 (&N)')
+        self.changeModeAction.setStatusTip(u'学习')
+        self.changeModeAction.setIcon(
+            QtGui.QIcon(
+                os.path.join(self.iconDir, self.newWordIconName)
+            )
+        )
+        self.reciteManager.setReciteMode(ReciteManager.Modes.Review)
+        self.nextWord()
+
     def changeReciteMode(self):
-        sender = self.sender()
-        modeTo = unicode(sender.text().toUtf8(), 'utf-8')
+        # sender = self.sender()
+        modeTo = unicode(self.changeModeAction.text().toUtf8(), 'utf-8')
+
         if modeTo == u'学习 (&N)':
-            self.changeModeAction.setText(u'复习 (&R)')
-            self.changeModeAction.setStatusTip(u'复习')
-            self.changeModeAction.setIcon(
-                QtGui.QIcon(
-                    os.path.join(self.iconDir, self.reviewIconName)
-                )
-            )
-            self.reciteManager.setReciteMode(ReciteManager.Modes.New)
-            self.nextWord()
+            self.changeModeToNew()
         elif modeTo == u'复习 (&R)':
-            self.changeModeAction.setText(u'学习 (&N)')
-            self.changeModeAction.setStatusTip(u'学习')
-            self.changeModeAction.setIcon(
-                QtGui.QIcon(
-                    os.path.join(self.iconDir, self.newWordIconName)
-                )
-            )
-            self.reciteManager.setReciteMode(ReciteManager.Modes.Review)
-            self.nextWord()
+            self.changeModeToReview()
 
     def help(self):
         helpMessage = u"""
@@ -554,7 +561,8 @@ class Window(QtGui.QMainWindow):
 
     # 点击系统托盘信息的响应处理
     def messageClicked(self):
-        pass
+        self.iconActivated(QtGui.QSystemTrayIcon.Trigger)
+        self.changeModeToReview()
 
     def closeEvent(self, event):
         if not QtGui.QSystemTrayIcon.isSystemTrayAvailable():
@@ -609,6 +617,7 @@ if __name__ == '__main__':
     mainIconName = 'main.png'
 
     app = SingleApplication(sys.argv)
+
     if not app.isSingle:
         QtGui.QMessageBox.information(
             None,
@@ -636,3 +645,5 @@ if __name__ == '__main__':
 # DONE: 单词发音
 # TODO: 设置
 # TODO: 词汇统计，确定按钮，绘制曲线
+# TODO: 多字典选择
+# TODO: 多语种记忆

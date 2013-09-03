@@ -54,7 +54,9 @@ class Ebbinghaus:
             return False
 
     def getNeedReciteWords(self):
+        self.neeReciteWords = []
         for record in self.records:
             if self.needRecite(record):
                 self.neeReciteWords.append(record)
         return self.neeReciteWords
+
