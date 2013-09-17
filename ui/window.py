@@ -14,7 +14,7 @@ class Window(QtGui.QMainWindow):
     windowTitle = 'Hello Word'
 
     # 版本
-    version = '0.2.2.1'
+    version = '0.2.3'
 
     # 词库
     lexiconDir = 'res/lexicons/'

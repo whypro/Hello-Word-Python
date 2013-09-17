@@ -103,7 +103,6 @@ class StatDialog(QtGui.QDialog):
         # 取消表格边框
         # tableWidget.setWindowFlags(QtCore.Qt.FramelessWindowHint)
 
-
         chartWidget = ChartWidget(self, records)
 
         tabWidget = QtGui.QTabWidget(self)
