@@ -4,6 +4,8 @@ import time
 import random
 from pystardict import Dictionary
 from models import Word, ReciteRecord, Ebbinghaus
+from threading import Thread
+from PyQt4 import QtGui
 try:
     import cPickle as pickle
 except ImportError:
@@ -209,15 +211,16 @@ class SettingsManager:
 
     def __init__(self, settingsPath):
         self.settingsPath = settingsPath
+        self.settings = {}
         if not self.loadSettings():
             self.initSettings()
 
     def initSettings(self):
-        self.settings = {}
+        self.settings.clear()
         self.settings['autoPlayVoice'] = True   # 自动发音
         self.settings['voiceGender'] = self.VoiceGender.Male
-        self.settings['firstTime'] = True       # 首次启动
-        self.settings['reciteHintInterval'] = 300   # 复习间隔，秒
+        self.settings['reciteHintInterval'] = 30   # 复习间隔，分钟
+        self.settings['showGuide'] = True   # 显示向导
 
     def saveSettings(self):
         dirname = os.path.dirname(self.settingsPath)
@@ -228,18 +231,16 @@ class SettingsManager:
         f.close()
 
     def loadSettings(self):
+        self.initSettings()
         if os.path.exists(self.settingsPath):
             f = open(self.settingsPath, 'rb')
-            self.settings = pickle.load(f)
+            settings = pickle.load(f)
             f.close()
+            self.settings.update(settings)
             return True
         else:
             print u'记录文件不存在'
             return False
-
-
-from threading import Thread
-from PyQt4 import QtGui
 
 
 # 复习提示，在系统托盘显示提示消息
@@ -261,7 +262,7 @@ class EbbinghausManager(Thread):
                     QtGui.QSystemTrayIcon.NoIcon
                 )
             print self.window.settingsManager.settings['reciteHintInterval']
-            time.sleep(self.window.settingsManager.settings['reciteHintInterval'])
+            time.sleep(self.window.settingsManager.settings['reciteHintInterval'] * 60)
 
 
 if __name__ == '__main__':

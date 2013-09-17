@@ -1,139 +1,13 @@
 # -*- coding: utf-8 -*-
-import sys
 import os
-import time
-from PyQt4 import QtGui, QtCore, QtNetwork
+from PyQt4 import QtGui, QtCore
 from PyQt4.phonon import Phonon
 from managers import ReciteManager, SettingsManager
 import string
 
-
-class StatDialog(QtGui.QDialog):
-    def __init__(self, parent=None, records=None):
-        super(StatDialog, self).__init__(parent)
-        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        self.setWindowTitle(u'词汇统计')
-
-        tableWidget = QtGui.QTableWidget(len(records), 5, self)
-        # 设置表头
-        tableWidget.setHorizontalHeaderLabels(
-            (u'单词', u'首次记忆时间', u'上次记忆时间', u'阶段', u'陌生度')
-        )
-        tableWidget.verticalHeader().setVisible(False)
-        tableWidget.horizontalHeader().setHighlightSections(False)  # 禁止表头高亮
-
-        for row in xrange(len(records)):
-            tableItemData = [
-                records[row].wordName,
-                time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(records[row].startTime)),
-                time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(records[row].lastTime)),
-                str(records[row].stage),
-                str(records[row].strange),
-            ]
-
-            for col in xrange(len(tableItemData)):
-                tableItem = QtGui.QTableWidgetItem(tableItemData[col])
-                tableItem.setTextAlignment(QtCore.Qt.AlignCenter)
-                #tableItem.setFlags(QtCore.Qt.ItemIsEnabled)
-                tableWidget.setItem(row, col, tableItem)
-
-        tableWidget.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)     # 禁止编辑
-        tableWidget.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)    # 整行选中的方式
-        tableWidget.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)   # 设置为只能选中单个目标
-        tableWidget.setSortingEnabled(True)
-        # 重设列宽
-        tableWidget.resizeColumnToContents(1)
-        tableWidget.resizeColumnToContents(2)
-        tableWidget.resizeRowsToContents()
-        tableWidget.horizontalHeader().setStretchLastSection(True)
-        # 取消表格边框
-        # tableWidget.setWindowFlags(QtCore.Qt.FramelessWindowHint)
-        tabWidget = QtGui.QTabWidget(self)
-        tabWidget.addTab(tableWidget, u'记忆中')
-
-        buttonBox = QtGui.QDialogButtonBox(parent=self)
-        #buttonBox.setOrientation(QtCore.Qt.Horizontal)      # 设置为水平方向
-        #buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Ok)
-        okButton = QtGui.QPushButton(u'确定')
-        okButton.clicked.connect(self.accept)
-        buttonBox.addButton(okButton, QtGui.QDialogButtonBox.AcceptRole)
-        #buttonBox.accepted.connect(self.accept)
-
-        layout = QtGui.QVBoxLayout()
-        layout.addWidget(tabWidget)
-        layout.addWidget(buttonBox)
-        self.setLayout(layout)
-
-        # 根据屏幕大小设置窗口大小，并居中
-        screen = QtGui.QDesktopWidget().screenGeometry()
-        height = screen.height() / 2
-        self.setMinimumHeight(height)
-        width = 600
-        self.setMinimumWidth(width)
-        self.move((screen.width()-width)/2, (screen.height()-height)/2)
-        self.setFocusPolicy(QtCore.Qt.StrongFocus)
-
-
-class SettingsDialog(QtGui.QDialog):
-    def __init__(self, parent=None, settingsManager=None):
-        super(SettingsDialog, self).__init__(parent)
-        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        self.setWindowTitle(u'设置')
-
-        self.settingsManager = settingsManager
-
-        voiceGroup = QtGui.QGroupBox(u'发音设置')
-
-        self.autoPlayCheck = QtGui.QCheckBox(u'自动朗读单词')
-        voiceGenderLabel = QtGui.QLabel(u'朗读模式')
-        self.voiceGenderCombo = QtGui.QComboBox()
-        self.voiceGenderCombo.addItems([u'男声', u'女声'])
-
-        voiceGenderLayout = QtGui.QHBoxLayout()
-        voiceGenderLayout.addWidget(voiceGenderLabel)
-        voiceGenderLayout.addWidget(self.voiceGenderCombo)
-
-        voiceLayout = QtGui.QVBoxLayout()
-        voiceLayout.addWidget(self.autoPlayCheck)
-        voiceLayout.addLayout(voiceGenderLayout)
-        voiceGroup.setLayout(voiceLayout)
-
-        buttonBox = QtGui.QDialogButtonBox(parent=self)
-        okButton = QtGui.QPushButton(u'保存')
-        okButton.clicked.connect(self.accept)
-        cancelButton = QtGui.QPushButton(u'取消')
-        cancelButton.clicked.connect(self.accept)
-        resetButton = QtGui.QPushButton(u'重置')
-        resetButton.clicked.connect(self.resetConfig)
-
-        buttonBox.addButton(okButton, QtGui.QDialogButtonBox.AcceptRole)
-        buttonBox.addButton(cancelButton, QtGui.QDialogButtonBox.RejectRole)
-        buttonBox.addButton(resetButton, QtGui.QDialogButtonBox.ResetRole)
-
-        self.initConfig()
-
-        mainLayout = QtGui.QVBoxLayout()
-        mainLayout.addWidget(voiceGroup)
-        mainLayout.addWidget(buttonBox)
-        mainLayout.addStretch(1)
-
-        self.setLayout(mainLayout)
-
-    def initConfig(self):
-        self.autoPlayCheck.setChecked(self.settingsManager.settings['autoPlayVoice'])
-        self.voiceGenderCombo.setCurrentIndex(self.settingsManager.settings['voiceGender'])
-
-    def accept(self):
-        # 保存配置
-        self.settingsManager.settings['autoPlayVoice'] = self.autoPlayCheck.isChecked()
-        self.settingsManager.settings['voiceGender'] = self.voiceGenderCombo.currentIndex()
-        self.settingsManager.saveSettings()
-        super(SettingsDialog, self).accept()
-
-    def resetConfig(self):
-        self.settingsManager.initSettings()
-        self.initConfig()
-
+from wizard import Wizard
+from settingsdialog import SettingsDialog
+from statdialog import StatDialog
 
 class Window(QtGui.QMainWindow):
     # 标题
@@ -197,6 +71,10 @@ class Window(QtGui.QMainWindow):
         self.settingsManager = SettingsManager(self.settingsPath)
 
         self.initMainPanel()    # 初始化中央面板
+
+        if self.settingsManager.settings.get('showGuide'):
+            self.initWizard()
+
         self.initVoice()
         self.nextWord()
         self.initSysTray()
@@ -205,6 +83,11 @@ class Window(QtGui.QMainWindow):
         from managers import EbbinghausManager
         self.ebbinghausManager = EbbinghausManager(self)
         self.ebbinghausManager.start()
+
+    def initWizard(self):
+        # 显示向导，模态对话框
+        wizard = Wizard(self)
+        wizard.exec_()
 
     def initWindow(self):
         windowTitle = self.windowTitle + ' | ' + self.reciteManager.getLexiconName()
@@ -215,7 +98,7 @@ class Window(QtGui.QMainWindow):
             )
         )
 
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowCloseButtonHint)
+        # self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowCloseButtonHint)
         self.setWindowFlags(
             QtCore.Qt.CustomizeWindowHint |
             QtCore.Qt.WindowMinimizeButtonHint |
@@ -570,80 +453,5 @@ class Window(QtGui.QMainWindow):
         else:
             self.hide()
             self.sysTrayIcon.show()
-            self.sysTrayIcon.showMessage(u"Hello Word", u"我在这里，点击我继续背单词哦～", QtGui.QSystemTrayIcon.NoIcon)
+            self.sysTrayIcon.showMessage(u"Hello Word", u"我在这里，点击我继续背单词哦～", QtGui.QSystemTrayIcon.NoIcon, 1000)
             event.ignore()
-
-
-class SingleApplication(QtGui.QApplication):
-    def __init__(self, argv):
-        super(SingleApplication, self).__init__(argv)
-        self.isSingle = True
-
-        self.setApplicationName('HelloWord')
-        serverName = self.applicationName()
-        socket = QtNetwork.QLocalSocket()
-        socket.connectToServer(serverName)
-        if socket.waitForConnected(1000):
-            # print u'已存在一个实例'
-            self.isSingle = False
-            return
-        # print u'建立本地服务器'
-        self.server = QtNetwork.QLocalServer(self)
-        # self.server.listen(serverName)
-        self.server.newConnection.connect(self.newLocalConnection)
-        if not self.server.listen(serverName):
-            #     print '听'
-            # 防止程序崩溃时,残留进程服务,移除之
-            # 确保监听成功
-            if self.server.serverError() == QtNetwork.QAbstractSocket.AddressInUseError and \
-                    QtCore.QFile.exists(self.server.serverName()):
-                QtCore.QFile.remove(self.server.serverName())
-        #       print u'什么情况？'
-                self.server.listen(serverName)
-
-    def newLocalConnection(self):
-        #self.activeWindow().show()
-        socket = self.server.nextPendingConnection()
-        if not socket:
-            return
-        # 其他处理
-
-    def isSingle(self):
-        return self.isSingle
-
-if __name__ == '__main__':
-    iconDir = 'res/icons/'
-    splashIconName = 'splash.png'
-    mainIconName = 'main.png'
-
-    app = SingleApplication(sys.argv)
-
-    if not app.isSingle:
-        QtGui.QMessageBox.information(
-            None,
-            "Hello Word",
-            u"程序已经在运行了哦~",
-        )
-        app.quit()
-    else:
-        # 显示 splash
-        splash = QtGui.QSplashScreen(QtGui.QPixmap(os.path.join(iconDir, splashIconName)))
-        splash.show()
-        splash.showMessage(u'孵化中...', QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter, QtCore.Qt.white)
-        # 主窗体
-        m = Window()
-        splash.showMessage(u'孵化完成!', QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter, QtCore.Qt.white)
-        m.show()
-        # 主窗体加载完成后释放
-        splash.finish(m)
-        del splash
-        app.exec_()
-
-
-# DONE: 只运行一个实例
-# TODO: 复习提示
-# DONE: 单词发音
-# TODO: 设置
-# TODO: 词汇统计，确定按钮，绘制曲线
-# TODO: 多字典选择
-# TODO: 多语种记忆
