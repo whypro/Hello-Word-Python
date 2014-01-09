@@ -73,7 +73,8 @@ class Window(QtGui.QMainWindow):
         self.initMainPanel()    # 初始化中央面板
 
         if self.settingsManager.settings.get('showGuide'):
-            self.initWizard()
+            # self.initWizard()
+            self.helpAction.trigger()
 
         self.initVoice()
         self.nextWord()
