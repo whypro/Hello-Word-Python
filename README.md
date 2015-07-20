@@ -14,11 +14,11 @@
 * 使用 Python + Qt 开发
 
 ## 截图 ##
-![image](https://sourceforge.net/p/hello-word-python/screenshot/2.png) ![image](https://sourceforge.net/p/hello-word-python/screenshot/3.png)
- 
-![image](https://sourceforge.net/p/hello-word-python/screenshot/4.png) ![image](https://sourceforge.net/p/hello-word-python/screenshot/5.png) 
-
-![image](https://sourceforge.net/p/hello-word-python/screenshot/6.png) ![image](https://sourceforge.net/p/hello-word-python/screenshot/8.png) 
+![image](https://raw.githubusercontent.com/whypro/Hello-Word-Python/master/screenshots/2.png) ![image](https://raw.githubusercontent.com/whypro/Hello-Word-Python/master/screenshots/3.png)
+  
+![image](https://raw.githubusercontent.com/whypro/Hello-Word-Python/master/screenshots/4.png) ![image](https://raw.githubusercontent.com/whypro/Hello-Word-Python/master/screenshots/5.png) 
+  
+![image](https://raw.githubusercontent.com/whypro/Hello-Word-Python/master/screenshots/6.png) ![image](https://raw.githubusercontent.com/whypro/Hello-Word-Python/master/screenshots/8.png) 
 
 ## 下载 ##
 * Windows
