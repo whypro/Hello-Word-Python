@@ -51,7 +51,7 @@ class _StarDictIfo(object):
         ifo_filename = '%s.ifo' % dict_prefix
 
         try:
-            _file = open(ifo_filename)
+            _file = open(ifo_filename, encoding='utf-8')
         except IOError:
             raise Exception('.ifo file does not exists')
 
@@ -400,7 +400,7 @@ class _StarDictSyn(object):
         syn_filename = '%s.syn' % dict_prefix
 
         try:
-            self._file = open(syn_filename)
+            self._file = open(syn_filename, encoding='utf-8')
         except IOError:
             # syn file is optional, passing silently
             pass

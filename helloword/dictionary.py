@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function, absolute_import
+from __future__ import unicode_literals, print_function
 import os
 import json
 
@@ -46,7 +46,7 @@ class GoogleAPI(object):
 class Dictionary(object):
     
     def __init__(self, dict_path, dict_prefix):
-        self.stardict = StarDict(filename_prefix=os.path.join(dict_path, dict_prefix), in_memory=True)
+        self.stardict = StarDict(filename_prefix=os.path.join(dict_path, dict_prefix))
         self.shanbay_api = ShanbayAPI()
 
     def lookup(self, word_name):
@@ -67,7 +67,7 @@ class Dictionary(object):
             word.name = word_name
             word.pronunciation = pronunciation
             word.definition = definition
-            print(word)
+            # print(word)
             return word
 
     def get_audio(self, word):
@@ -78,9 +78,9 @@ class Dictionary(object):
 
 
 if __name__ == '__main__':
-    d = Dictionary('./resources/dicts/stardict-langdao-ec-gb-2.4.2', 'langdao-ec-gb')
-    word = d.lookup('good')
+    d = Dictionary('../res/dicts/stardict-xdict-ec-gb-2.4.2', 'xdict-ec-gb')
+    w = d.lookup('good')
     import sys 
     print(sys.version)
-    print(d.get_audio(word))
+    print(d.get_audio(w))
 

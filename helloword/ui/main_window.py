@@ -1,27 +1,35 @@
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 import sys
 import os
 
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5 import QtWidgets, QtCore, QtGui, QtMultimedia
 
 from .ui_main_window import Ui_MainWindow
 from ..config import Config
+from ..recite_manager import ReciteManager
 
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     # 显示状态
-    class DisplayStatus:
-        Display, Input, Correct, Wrong = range(4)
+    class DisplayState:
+        DISPLAY, INPUT, CORRECT, WRONG = range(4)
 
     def __init__(self):
         super(MainWindow, self).__init__()
         self.setupUi(self)
         self.menu_sys_tray = QtWidgets.QMenu(self)
         self.sys_tray_icon = QtWidgets.QSystemTrayIcon(self)
+        self.media_player = QtMultimedia.QMediaPlayer(self)
 
         # self.lexicon_dir = Config.lexicon_dir
         self.config = Config()
+        self.recite_manager = ReciteManager(
+            dict_path=self.config.dict_dir,
+            dict_prefix=self.config.dict_prefix,
+            lexicon_path=os.path.join(self.config.lexicon_dir, self.config.lexicon_name)
+        )
 
         self.init_window()
         self.init_menu()
@@ -61,6 +69,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.action_about.triggered.connect(self.show_about)
         self.action_exit.triggered.connect(QtWidgets.qApp.quit)
 
+        self.push_button_uk_pron.clicked.connect(self.pronounce_uk)
+        self.push_button_us_pron.clicked.connect(self.pronounce_us)
+
     def choose_lexicon(self):
         file_path = QtWidgets.QFileDialog().getOpenFileName(
             parent=self,
@@ -82,6 +93,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.menu_file.insertAction(self.action_settings, self.action_review_mode)
         self.toolbar.removeAction(self.action_new_mode)
         self.toolbar.insertAction(self.action_settings, self.action_review_mode)
+        self.show_next_word()
 
         # self.reciteManager.setReciteMode(ReciteManager.Modes.New)
         # self.nextWord()
@@ -91,6 +103,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.menu_file.insertAction(self.action_settings, self.action_new_mode)
         self.toolbar.removeAction(self.action_review_mode)
         self.toolbar.insertAction(self.action_settings, self.action_new_mode)
+        self.show_next_word()
 
     def show_help(self):
         help_message = """
@@ -149,6 +162,47 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.sys_tray_icon.show()
             # self.sys_tray_icon.showMessage('Hello Word', '我在这里，点击我继续背单词哦～', QtWidgets.QSystemTrayIcon.NoIcon, 5000)
             event.ignore()
+
+    def show_next_word(self):
+        self.recite_manager.next_word()
+        word = self.recite_manager.current_word
+        if self.recite_manager.recite_mode == ReciteManager.ReciteMode.REVIEW and not word:
+            QtWidgets.QMessageBox().information(self, 'Hello Word', '恭喜，没有需要复习的单词了~')
+            self.set_new_mode()
+            return
+
+        # 设置颜色
+        palette = QtGui.QPalette()
+        palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.black)
+        self.label_word_name.setPalette(palette)
+        self.label_word_name.setText(word.name)
+        self.label_pronunciation.setText(word.pronunciation)
+        self.text_browser_definition.setText(word.definition)
+        # self.spelling = ''
+        # self.display_state = self.DisplayState.DISPLAY
+        # self.statusBar.showMessage(u'"."键跳过该单词，"/"键发音，空格键或回车键检查拼写，退格键修正拼写')
+
+        # import urllib2
+        # i = urllib2.urlopen('http://img1.51cto.com/attachment/200910/200910271256653086390.png').read()
+        # image = QtGui.QPixmap()
+        # image.convertFromImage(QtGui.QImage(i)
+        # self.lblWordName.setPixmap(image)
+
+        # 发音
+        # if self.settingsManager.settings.get('autoPlayVoice') is True:
+            # self.playWord()
+
+    def pronounce_uk(self):
+        url = self.recite_manager.get_audio('uk')
+        self.media_player.setMedia(QtMultimedia.QMediaContent(QtCore.QUrl(url)))
+        self.media_player.setVolume(50)
+        self.media_player.play()
+
+    def pronounce_us(self):
+        url = self.recite_manager.get_audio('us')
+        self.media_player.setMedia(QtMultimedia.QMediaContent(QtCore.QUrl(url)))
+        self.media_player.setVolume(50)
+        self.media_player.play()
 
 
 if __name__ == '__main__':
